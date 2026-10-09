@@ -20,7 +20,6 @@ import {
   generateSuggestedQuestions
 } from './services/quizGenerator';
 import { db, clearAllLocalData } from './db';
-import { SAMPLE_BIOLOGY_DOCUMENT } from './data/sampleBiologyDoc';
 
 import { Navbar } from './components/Navbar';
 import { DocumentLibrary } from './components/DocumentLibrary';
@@ -215,18 +214,6 @@ export function App() {
     }
   };
 
-  // Load Sample Biology Chapter Handler
-  const handleLoadSample = async () => {
-    const sample = SAMPLE_BIOLOGY_DOCUMENT;
-    await processAndStoreDocument(
-      sample.name,
-      'sample',
-      sample.text.length,
-      sample.text,
-      5
-    );
-  };
-
   // Delete Document
   const handleDeleteDocument = async (docId: string) => {
     await db.transaction('rw', db.documents, db.chunks, db.quizzes, db.flashcards, async () => {
@@ -333,7 +320,7 @@ export function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#f8f9fa] text-slate-800 overflow-hidden font-sans">
+    <div className="flex flex-col h-screen bg-[#0f1117] text-slate-100 overflow-hidden font-sans">
       {/* Top Navbar */}
       <Navbar
         webgpuDiag={webgpuDiag}
@@ -351,13 +338,13 @@ export function App() {
       />
 
       {/* Mobile Tab Selector */}
-      <div className="md:hidden flex border-b border-stone-200 bg-white text-xs font-bold">
+      <div className="md:hidden flex border-b border-slate-800 bg-[#13161f] text-xs font-bold text-slate-400">
         <button
           onClick={() => setMobileTab('sources')}
           className={`flex-1 py-2.5 text-center border-b-2 transition-colors ${
             mobileTab === 'sources'
-              ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
+              ? 'border-indigo-500 text-indigo-400 bg-indigo-500/10'
+              : 'border-transparent hover:text-slate-200'
           }`}
         >
           Sources ({documents.length})
@@ -366,8 +353,8 @@ export function App() {
           onClick={() => setMobileTab('chat')}
           className={`flex-1 py-2.5 text-center border-b-2 transition-colors ${
             mobileTab === 'chat'
-              ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
+              ? 'border-indigo-500 text-indigo-400 bg-indigo-500/10'
+              : 'border-transparent hover:text-slate-200'
           }`}
         >
           Adaptive Tutor
@@ -376,8 +363,8 @@ export function App() {
           onClick={() => setMobileTab('studio')}
           className={`flex-1 py-2.5 text-center border-b-2 transition-colors ${
             mobileTab === 'studio'
-              ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
+              ? 'border-indigo-500 text-indigo-400 bg-indigo-500/10'
+              : 'border-transparent hover:text-slate-200'
           }`}
         >
           Study Studio
@@ -396,7 +383,6 @@ export function App() {
             documents={documents}
             chunks={chunks}
             onUploadFile={handleUploadFile}
-            onLoadSample={handleLoadSample}
             onDeleteDocument={handleDeleteDocument}
             onClearAll={handleClearAll}
             isIngesting={isIngesting}

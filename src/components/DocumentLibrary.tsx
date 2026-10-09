@@ -4,7 +4,6 @@ import {
   FileText,
   Trash2,
   BookOpen,
-  Sparkles,
   Layers,
   ChevronRight,
   ChevronDown,
@@ -18,7 +17,6 @@ interface DocumentLibraryProps {
   documents: DocumentItem[];
   chunks: DocumentChunk[];
   onUploadFile: (file: File) => Promise<void>;
-  onLoadSample: () => Promise<void>;
   onDeleteDocument: (docId: string) => Promise<void>;
   onClearAll: () => Promise<void>;
   isIngesting: boolean;
@@ -30,7 +28,6 @@ export const DocumentLibrary = ({
   documents,
   chunks,
   onUploadFile,
-  onLoadSample,
   onDeleteDocument,
   onClearAll,
   isIngesting,
@@ -59,21 +56,21 @@ export const DocumentLibrary = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#fafaf9] border-r border-stone-200/80 p-4 overflow-y-auto">
+    <div className="flex flex-col h-full bg-[#13161f] border-r border-slate-800/80 p-4 overflow-y-auto text-slate-200">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-stone-200">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700">
+          <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
             <BookOpen className="w-4 h-4" />
           </div>
-          <h2 className="font-bold text-sm text-slate-900">Study Materials</h2>
+          <h2 className="font-bold text-sm text-white">Study Materials</h2>
         </div>
-        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-stone-200/70 text-slate-700">
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/60">
           {documents.length} source{documents.length === 1 ? '' : 's'}
         </span>
       </div>
 
-      {/* Upload & Sample Section */}
+      {/* Upload Box (Strictly user-uploaded files, sample button removed) */}
       <div className="mt-4 space-y-2.5">
         <input
           ref={fileInputRef}
@@ -92,53 +89,43 @@ export const DocumentLibrary = ({
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition-all bg-white shadow-2xs ${
+          className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${
             isDragging
-              ? 'border-indigo-500 bg-indigo-50/50'
-              : 'border-stone-300 hover:border-indigo-400 hover:bg-indigo-50/20'
+              ? 'border-indigo-400 bg-indigo-500/10'
+              : 'border-slate-750 bg-slate-900/60 hover:border-indigo-500 hover:bg-slate-900'
           }`}
         >
-          <div className="mx-auto w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 mb-2">
+          <div className="mx-auto w-11 h-11 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-2.5 shadow-sm">
             <Upload className="w-5 h-5" />
           </div>
-          <p className="text-xs font-semibold text-slate-800">
-            Click or drag & drop notes here
+          <p className="text-xs font-semibold text-white">
+            Upload your PDF, DOCX or Notes
           </p>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            Accepts PDF, Word (DOCX), TXT, Markdown
+          <p className="text-[11px] text-slate-400 mt-1">
+            Drag & drop files or click to browse
           </p>
         </div>
-
-        {/* Quick Sample Button */}
-        <button
-          onClick={onLoadSample}
-          disabled={isIngesting}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold bg-white hover:bg-violet-50/60 border border-violet-200 text-violet-700 transition-colors disabled:opacity-50 shadow-2xs"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-violet-500" />
-          <span>Load Sample: Mitochondria Chapter</span>
-        </button>
       </div>
 
       {/* Ingestion Status Banner */}
       {isIngesting && (
-        <div className="mt-4 p-3 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center gap-3 animate-pulse shadow-2xs">
-          <Loader2 className="w-4 h-4 text-indigo-600 animate-spin flex-shrink-0" />
+        <div className="mt-4 p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/30 flex items-center gap-3 animate-pulse shadow-sm">
+          <Loader2 className="w-4 h-4 text-indigo-400 animate-spin flex-shrink-0" />
           <div className="text-xs">
-            <p className="font-semibold text-indigo-900">Preparing Study Material</p>
-            <p className="text-[11px] text-indigo-700">{ingestionStatus}</p>
+            <p className="font-semibold text-indigo-200">Processing Document</p>
+            <p className="text-[11px] text-indigo-300/80">{ingestionStatus}</p>
           </div>
         </div>
       )}
 
       {/* Document List */}
       <div className="mt-5 flex-1 space-y-2.5">
-        <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-slate-500 px-1 font-bold">
+        <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-slate-400 px-1 font-bold">
           <span>Active Notebooks</span>
           {documents.length > 0 && (
             <button
               onClick={onClearAll}
-              className="text-slate-400 hover:text-red-600 transition-colors font-semibold"
+              className="text-slate-400 hover:text-rose-400 transition-colors font-semibold"
               title="Remove all sources"
             >
               Clear All
@@ -147,11 +134,11 @@ export const DocumentLibrary = ({
         </div>
 
         {documents.length === 0 ? (
-          <div className="p-6 text-center border border-dashed border-stone-200 rounded-2xl bg-white/70 shadow-2xs">
-            <FolderOpen className="w-8 h-8 text-stone-300 mx-auto mb-2" />
-            <p className="text-xs text-slate-700 font-semibold">Your study shelf is empty</p>
-            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-              Upload textbook chapters, syllabi, or lecture slides to enable adaptive tutoring.
+          <div className="p-6 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/40 my-2">
+            <FolderOpen className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+            <p className="text-xs text-slate-300 font-semibold">Your shelf is empty</p>
+            <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+              Upload your textbook chapter, syllabus, or lecture slides to generate tailored quizzes and start learning.
             </p>
           </div>
         ) : (
@@ -162,22 +149,22 @@ export const DocumentLibrary = ({
             return (
               <div
                 key={doc.id}
-                className="border border-stone-200/90 rounded-2xl bg-white hover:border-stone-300 transition-colors shadow-2xs overflow-hidden"
+                className="border border-slate-800 rounded-2xl bg-slate-900/80 hover:border-slate-700 transition-colors overflow-hidden"
               >
                 <div className="p-3 flex items-start justify-between gap-2">
                   <div
                     className="flex items-start gap-2.5 flex-1 min-w-0 cursor-pointer"
                     onClick={() => setExpandedDocId(isExpanded ? null : doc.id)}
                   >
-                    <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 flex-shrink-0 mt-0.5">
+                    <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 flex-shrink-0 mt-0.5">
                       <FileText className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-slate-800 truncate" title={doc.name}>
+                      <p className="text-xs font-semibold text-slate-100 truncate" title={doc.name}>
                         {doc.name}
                       </p>
-                      <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-500">
-                        <span className="uppercase font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">
+                      <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-400">
+                        <span className="uppercase font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">
                           {doc.type}
                         </span>
                         <span>•</span>
@@ -195,7 +182,7 @@ export const DocumentLibrary = ({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setExpandedDocId(isExpanded ? null : doc.id)}
-                      className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-stone-100"
+                      className="p-1 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800"
                       title="Inspect chunks"
                     >
                       {isExpanded ? (
@@ -206,7 +193,7 @@ export const DocumentLibrary = ({
                     </button>
                     <button
                       onClick={() => onDeleteDocument(doc.id)}
-                      className="p-1 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                      className="p-1 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
                       title="Delete document"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -216,24 +203,25 @@ export const DocumentLibrary = ({
 
                 {/* Chunks Accordion */}
                 {isExpanded && (
-                  <div className="border-t border-stone-100 bg-[#f8f9fa] p-2.5 space-y-1.5 max-h-48 overflow-y-auto">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                      <Layers className="w-3 h-3 text-indigo-600" />
-                      <span>Textbook Chunks ({docChunks.length})</span>
+                  <div className="border-t border-slate-800 bg-slate-950/60 p-2.5 space-y-1.5 max-h-48 overflow-y-auto">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      <Layers className="w-3 h-3 text-indigo-400" />
+                      <span>Document Chunks ({docChunks.length})</span>
                     </div>
                     {docChunks.map((chunk, idx) => (
                       <div
                         key={chunk.id}
                         onClick={() => onSelectChunkForPreview(chunk)}
-                        className="p-2 rounded-xl bg-white hover:bg-indigo-50/40 border border-stone-200/70 text-[11px] text-slate-700 cursor-pointer transition-colors shadow-2xs"
+                        className="p-2 rounded-xl bg-slate-900 hover:bg-indigo-950/40 border border-slate-800 text-[11px] text-slate-300 cursor-pointer transition-colors"
                       >
-                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-                          <span className="font-bold text-indigo-700">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                          <span className="font-bold text-indigo-400">
                             Excerpt #{idx + 1}
+                            {chunk.pageNumber ? ` (p.${chunk.pageNumber})` : ''}
                           </span>
                           <span>~{chunk.tokenEstimate} tokens</span>
                         </div>
-                        <p className="line-clamp-2 text-slate-600">
+                        <p className="line-clamp-2 text-slate-300">
                           {chunk.text}
                         </p>
                       </div>
@@ -247,9 +235,9 @@ export const DocumentLibrary = ({
       </div>
 
       {/* RAG pipeline info footer */}
-      <div className="mt-4 pt-3 border-t border-stone-200 text-[11px] text-slate-500 flex items-center justify-between">
-        <span className="flex items-center gap-1.5 font-medium text-emerald-700">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+      <div className="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+        <span className="flex items-center gap-1.5 font-medium text-emerald-400">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
           <span>Local Vector Store</span>
         </span>
         <span className="font-mono text-[10px] text-slate-500">all-MiniLM-L6-v2</span>
