@@ -194,16 +194,36 @@ export function App() {
       const ext = file.name.split('.').pop()?.toLowerCase();
 
       if (ext === 'pdf') {
-        setIngestionStatus('Parsing PDF with pdf.js...');
-        const parsed = await parsePdf(file);
+        setIngestionStatus('Parsing PDF pages...');
+        const parsed = await parsePdf(file, (curr, total) => {
+          setIngestionStatus(`Parsing PDF page ${curr} of ${total}...`);
+        });
+        if (!parsed.text || parsed.text.trim().length === 0) {
+          alert('Notice: No selectable text could be extracted from this PDF. If this is a scanned book or image-only PDF, please upload a text-based PDF, DOCX, or notes file.');
+          setIsIngesting(false);
+          setIngestionStatus('');
+          return;
+        }
         await processAndStoreDocument(file.name, 'pdf', file.size, parsed.text, parsed.pageCount);
       } else if (ext === 'docx') {
         setIngestionStatus('Parsing Word DOCX with mammoth.js...');
         const parsedText = await parseDocx(file);
+        if (!parsedText.trim()) {
+          alert('Notice: The uploaded DOCX file did not contain any text.');
+          setIsIngesting(false);
+          setIngestionStatus('');
+          return;
+        }
         await processAndStoreDocument(file.name, 'docx', file.size, parsedText);
       } else {
         setIngestionStatus('Reading plain text file...');
         const text = await file.text();
+        if (!text.trim()) {
+          alert('Notice: The uploaded file is empty.');
+          setIsIngesting(false);
+          setIngestionStatus('');
+          return;
+        }
         await processAndStoreDocument(file.name, 'txt', file.size, text);
       }
     } catch (err: any) {
