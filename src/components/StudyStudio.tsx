@@ -13,11 +13,12 @@ import {
   SmilePlus
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import type { QuizQuestion, Flashcard } from '../types';
+import type { QuizQuestion, Flashcard, DocumentChunk } from '../types';
 
 interface StudyStudioProps {
   quizzes: QuizQuestion[];
   flashcards: Flashcard[];
+  chunks?: DocumentChunk[];
   onGenerateQuizzes: () => void;
   hasDocuments: boolean;
 }
@@ -25,6 +26,7 @@ interface StudyStudioProps {
 export const StudyStudio = ({
   quizzes,
   flashcards,
+  chunks = [],
   onGenerateQuizzes,
   hasDocuments
 }: StudyStudioProps) => {
@@ -361,28 +363,35 @@ export const StudyStudio = ({
           <div className="p-4 rounded-2xl bg-white border border-stone-200 shadow-2xs space-y-2.5">
             <div className="flex items-center gap-1.5 font-bold text-indigo-700 text-xs">
               <Sparkles className="w-4 h-4 text-indigo-600" />
-              <span>Core Textbook Takeaways</span>
+              <span>Core Takeaways from Uploaded Notes</span>
             </div>
-            <ul className="list-disc pl-4 space-y-2 text-slate-700 text-[12px] leading-relaxed">
-              <li>
-                <strong>Double Membrane:</strong> Outer membrane contains porins; inner membrane forms folded cristae to maximize ETC surface area.
-              </li>
-              <li>
-                <strong>Proton Motive Force:</strong> Complexes I, III, and IV pump protons into the intermembrane space, creating an electrochemical gradient ($\Delta p$).
-              </li>
-              <li>
-                <strong>ATP Synthase Rotor:</strong> Chemiosmotic proton influx drives the rotary $F_0$ subunit, powering the catalytic $F_1$ unit to synthesize ATP from ADP + Pi.
-              </li>
-              <li>
-                <strong>Terminal Electron Acceptor:</strong> Molecular Oxygen ($O_2$) is reduced to water ($H_2O$), preventing electron backup.
-              </li>
-            </ul>
+            {chunks.length > 0 ? (
+              <ul className="list-disc pl-4 space-y-2 text-slate-700 text-[12px] leading-relaxed">
+                {chunks.slice(0, 5).map((chunk, idx) => {
+                  const clean = chunk.text
+                    .replace(/\[Page \d+\]/gi, '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                  const firstSentence = clean.split(/(?<=[.?!])\s+/)[0] || clean.slice(0, 120);
+                  return (
+                    <li key={idx}>
+                      <strong>{chunk.docName.replace(/\.[^/.]+$/, '')}</strong>
+                      {chunk.pageNumber ? ` (p.${chunk.pageNumber})` : ''}: {firstSentence}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-slate-500 italic text-[11px]">
+                Upload notes or study guides to auto-extract core takeaways here.
+              </p>
+            )}
           </div>
 
           <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 text-[11px] text-amber-900 space-y-1 shadow-2xs">
             <span className="font-bold text-amber-800">Adaptive Study Tip:</span>
             <p>
-              Switch the Complexity slider above to <em>&quot;Elementary&quot;</em> if you want a fun story-based analogy, or to <em>&quot;Expert&quot;</em> for biochemical thermodynamic formulas.
+              Switch the Complexity slider above to <em>&quot;Age 10 (Fun)&quot;</em> for story-based metaphors, or to <em>&quot;Undergraduate/Expert&quot;</em> for rigorous terminology and step-by-step mechanisms.
             </p>
           </div>
         </div>

@@ -1,105 +1,154 @@
 import type { DocumentChunk, QuizQuestion, Flashcard } from '../types';
 
+interface ConceptFact {
+  subject: string;
+  predicate: string;
+  originalSentence: string;
+  sourceDoc: string;
+  page?: number;
+}
+
+/**
+ * Clean unwanted artifacts like page tags, brackets, and extra spaces
+ */
+function cleanSentence(s: string): string {
+  return s
+    .replace(/\[Page \d+\]/gi, '')
+    .replace(/\[\d+\]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Extract sentences with rich educational statements
+ */
+function extractFactSentences(chunks: DocumentChunk[]): ConceptFact[] {
+  const facts: ConceptFact[] = [];
+  const definitionRegexes = [
+    /\b(?:is|are|refers to|represents|serves as|functions as|defined as|consists of|enables|provides)\b/i
+  ];
+
+  for (const chunk of chunks) {
+    const rawSentences = chunk.text
+      .split(/(?<=[.?!])\s+/)
+      .map(cleanSentence)
+      .filter(s => s.length >= 35 && s.length <= 260);
+
+    for (const raw of rawSentences) {
+      // Skip headings, table fragments, or sentences without letters
+      if (!/[a-zA-Z]/.test(raw) || raw.split(' ').length < 6) continue;
+      if (raw.toLowerCase().startsWith('page ') || raw.toLowerCase().startsWith('chapter ')) continue;
+
+      for (const regex of definitionRegexes) {
+        const match = raw.match(regex);
+        if (match && match.index && match.index > 3) {
+          const subject = raw.slice(0, match.index).trim();
+          const predicate = raw.slice(match.index).trim();
+          if (subject.length > 2 && subject.split(' ').length <= 6 && predicate.length > 10) {
+            facts.push({
+              subject,
+              predicate,
+              originalSentence: raw,
+              sourceDoc: chunk.docName,
+              page: chunk.pageNumber
+            });
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return facts;
+}
+
+/**
+ * Generate accurate, document-grounded quizzes directly from document text chunks
+ */
 export function generateQuizzesFromChunks(chunks: DocumentChunk[], count: number = 4): QuizQuestion[] {
   if (chunks.length === 0) return [];
 
   const quizzes: QuizQuestion[] = [];
-  const selectedChunks = chunks.slice(0, Math.min(chunks.length, count + 2));
+  const facts = extractFactSentences(chunks);
 
-  for (let i = 0; i < selectedChunks.length && quizzes.length < count; i++) {
-    const chunk = selectedChunks[i];
-    const text = chunk.text;
+  // Pool of subjects from the user's document to create realistic distractors
+  const documentSubjects = Array.from(new Set(facts.map(f => f.subject))).filter(s => s.length > 3);
 
-    // Pattern matching on educational concepts
-    if (text.toLowerCase().includes('atp') || text.toLowerCase().includes('energy')) {
+  // 1. Generate definition & mechanism questions from extracted facts
+  for (let i = 0; i < facts.length && quizzes.length < count; i++) {
+    const fact = facts[i];
+    const correctSubject = fact.subject;
+
+    // Pick 3 distractors from the same document if possible, or contextually plausible variations
+    const distractors: string[] = [];
+    const otherSubjects = documentSubjects.filter(s => s.toLowerCase() !== correctSubject.toLowerCase());
+
+    while (distractors.length < 3 && otherSubjects.length > 0) {
+      const randomIdx = Math.floor(Math.random() * otherSubjects.length);
+      const candidate = otherSubjects.splice(randomIdx, 1)[0];
+      if (!distractors.includes(candidate)) {
+        distractors.push(candidate);
+      }
+    }
+
+    // Fallback plausible distractors if document didn't have enough distinct entities
+    const fallbackTerms = [
+      'The outer peripheral interface',
+      'The secondary transport protocol',
+      'The inactive standby subsystem',
+      'The legacy static framework'
+    ];
+    let fbIdx = 0;
+    while (distractors.length < 3) {
+      distractors.push(fallbackTerms[fbIdx++] || `Alternative mechanism ${distractors.length + 1}`);
+    }
+
+    const options = [correctSubject, ...distractors];
+    // Shuffle options
+    const shuffled = options
+      .map((value) => ({ value, sort: Math.random() }))
+      .sort((a, b) => a.sort - b.sort)
+      .map((item) => item.value);
+
+    const correctIndex = shuffled.indexOf(correctSubject);
+
+    quizzes.push({
+      id: `quiz-doc-${i}-${Date.now()}`,
+      docId: chunks[0]?.docId || 'default',
+      docName: fact.sourceDoc,
+      question: `According to your document${fact.page ? ` (Page ${fact.page})` : ''}, what ${fact.predicate.charAt(0).toLowerCase() + fact.predicate.slice(1)}?`,
+      options: shuffled,
+      correctIndex,
+      explanation: `As stated in ${fact.sourceDoc}${fact.page ? ` (p.${fact.page})` : ''}: "${fact.originalSentence}"`,
+      socraticHint: `Look for the key component described as: "${fact.predicate.slice(0, 90)}..." in your notes.`
+    });
+  }
+
+  // 2. If facts were sparse, generate direct comprehension questions from full chunks
+  if (quizzes.length < count) {
+    for (let cIdx = 0; cIdx < chunks.length && quizzes.length < count; cIdx++) {
+      const chunk = chunks[cIdx];
+      const cleanText = cleanSentence(chunk.text);
+      const sentences = cleanText.split(/(?<=[.?!])\s+/).filter(s => s.length > 25);
+      if (sentences.length < 2) continue;
+
+      const targetSentence = sentences[Math.min(1, sentences.length - 1)];
+      const pageInfo = chunk.pageNumber ? ` (Page ${chunk.pageNumber})` : '';
+
       quizzes.push({
-        id: `quiz-${chunk.id}-${i}`,
+        id: `quiz-comp-${chunk.id}-${cIdx}`,
         docId: chunk.docId,
         docName: chunk.docName,
-        question: 'What is the primary role of ATP produced in cellular respiration?',
+        question: `Based on the excerpt from "${chunk.docName}"${pageInfo}, which statement accurately reflects the material?`,
         options: [
-          'To serve as the immediate chemical energy currency for cellular work',
-          'To form the structural lipid bilayer of the cell membrane',
-          'To directly store genetic hereditary information',
-          'To act as a waste product excreted during fermentation'
+          targetSentence,
+          `The text refutes this, claiming the opposite regarding ${chunk.docName.replace(/\.[^/.]+$/, '')}.`,
+          `The excerpt specifies that this process occurs without any active components or inputs.`,
+          `This concept has been superseded and is marked deprecated in modern implementations.`
         ],
         correctIndex: 0,
-        explanation:
-          'ATP (Adenosine Triphosphate) captures chemical energy obtained from the breakdown of food molecules and releases it to fuel other cellular processes.',
-        socraticHint:
-          'Think about what muscle contraction, enzyme action, and active transport need in real-time to function.'
-      });
-    } else if (text.toLowerCase().includes('cristae') || text.toLowerCase().includes('membrane')) {
-      quizzes.push({
-        id: `quiz-${chunk.id}-${i}`,
-        docId: chunk.docId,
-        docName: chunk.docName,
-        question: 'Why does the inner mitochondrial membrane have extensive folds called cristae?',
-        options: [
-          'To store calcium minerals inside the cytoplasm',
-          'To maximize surface area for electron transport complexes and ATP synthase',
-          'To prevent any protons from moving across the membrane',
-          'To allow large ribosomes to escape into the nucleus'
-        ],
-        correctIndex: 1,
-        explanation:
-          'The folded cristae vastly expand the membrane surface area, accommodating many more electron transport chains and ATP synthase complexes.',
-        socraticHint:
-          'Why do solar panels or radiators use repeated fins and folds rather than a flat sheet?'
-      });
-    } else if (text.toLowerCase().includes('oxygen') || text.toLowerCase().includes('electron')) {
-      quizzes.push({
-        id: `quiz-${chunk.id}-${i}`,
-        docId: chunk.docId,
-        docName: chunk.docName,
-        question: 'What is the role of molecular oxygen (O2) in the electron transport chain?',
-        options: [
-          'It acts as the initial electron donor at Complex I',
-          'It neutralizes glucose in the cytoplasm',
-          'It serves as the terminal electron acceptor, forming water',
-          'It pumps protons directly through the outer porin channels'
-        ],
-        correctIndex: 2,
-        explanation:
-          'Oxygen is highly electronegative and acts as the final electron acceptor at Complex IV, combining with electrons and protons to form H2O.',
-        socraticHint:
-          'Consider what happens at the very end of the electron slide: who catches the electrons so traffic does not jam?'
-      });
-    } else if (text.toLowerCase().includes('gradient') || text.toLowerCase().includes('chemiosmosis')) {
-      quizzes.push({
-        id: `quiz-${chunk.id}-${i}`,
-        docId: chunk.docId,
-        docName: chunk.docName,
-        question: 'How does chemiosmosis generate ATP during oxidative phosphorylation?',
-        options: [
-          'Through passive diffusion of glucose through nuclear pores',
-          'By using the proton electrochemical gradient across the inner membrane to spin ATP synthase',
-          'By directly absorbing sunlight inside the mitochondrial matrix',
-          'By breaking down ribosome subunits into amino acids'
-        ],
-        correctIndex: 1,
-        explanation:
-          'Chemiosmosis harnesses the potential energy stored in the transmembrane proton gradient (proton-motive force) as protons flow back through ATP synthase.',
-        socraticHint:
-          'Imagine water flowing through a hydroelectric dam turbine. What acts as the "water" behind the membrane dam?'
-      });
-    } else {
-      // General concept question derived from chunk
-      const firstSentence = text.split(/[.?!]/)[0]?.trim() || 'This biological structure';
-      quizzes.push({
-        id: `quiz-${chunk.id}-${i}`,
-        docId: chunk.docId,
-        docName: chunk.docName,
-        question: `Based on your reading: "${firstSentence.slice(0, 90)}...", which statement is true?`,
-        options: [
-          'It highlights a fundamental mechanism described directly in your study document.',
-          'It suggests cellular respiration occurs independently of any membranes.',
-          'It indicates energy generation requires no chemical substrates.',
-          'It proves cells operate without metabolic feedback.'
-        ],
-        correctIndex: 0,
-        explanation: 'This directly reflects the core factual findings presented in your uploaded study material.',
-        socraticHint: 'Review the opening sentences of the highlighted source excerpt.'
+        explanation: `Verified directly in ${chunk.docName}${pageInfo}: "${targetSentence}"`,
+        socraticHint: `Re-read excerpt #${chunk.chunkIndex + 1} from ${chunk.docName} to verify the explicit finding.`
       });
     }
   }
@@ -107,37 +156,81 @@ export function generateQuizzesFromChunks(chunks: DocumentChunk[], count: number
   return quizzes;
 }
 
+/**
+ * Generate accurate, document-derived active recall flashcards
+ */
 export function generateFlashcardsFromChunks(chunks: DocumentChunk[]): Flashcard[] {
-  const cards: Flashcard[] = [
-    {
-      id: 'fc-1',
+  if (chunks.length === 0) return [];
+
+  const cards: Flashcard[] = [];
+  const facts = extractFactSentences(chunks);
+
+  for (let i = 0; i < facts.length && cards.length < 8; i++) {
+    const fact = facts[i];
+    cards.push({
+      id: `fc-doc-${i}-${Date.now()}`,
       docId: chunks[0]?.docId || 'default',
-      front: 'What is the "Powerhouse of the Cell"?',
-      back: 'The Mitochondrion: an organelle that generates most of the chemical energy needed to power the cell\'s biochemical reactions via ATP synthesis.',
-      sourceRef: 'Chapter 2, Section 1'
-    },
-    {
-      id: 'fc-2',
-      docId: chunks[0]?.docId || 'default',
-      front: 'What is the Proton Motive Force (PMF)?',
-      back: 'The electrochemical gradient generated by pumping protons (H+) into the intermembrane space, which powers ATP synthase during chemiosmosis.',
-      sourceRef: 'Chapter 2, Section 3'
-    },
-    {
-      id: 'fc-3',
-      docId: chunks[0]?.docId || 'default',
-      front: 'What role does Cristae structure play?',
-      back: 'Cristae are the deep folds of the inner mitochondrial membrane that vastly increase surface area for electron transport chains and ATP synthase complexes.',
-      sourceRef: 'Chapter 2, Section 2'
-    },
-    {
-      id: 'fc-4',
-      docId: chunks[0]?.docId || 'default',
-      front: 'What is the Terminal Electron Acceptor in aerobic respiration?',
-      back: 'Molecular Oxygen (O2), which accepts electrons at Complex IV and combines with free protons to form water (H2O).',
-      sourceRef: 'Chapter 2, Section 4'
-    }
-  ];
+      front: `What ${fact.predicate.charAt(0).toLowerCase() + fact.predicate.slice(1)}?`,
+      back: `${fact.subject}.\n\nSource context: "${fact.originalSentence}"`,
+      sourceRef: `${fact.sourceDoc}${fact.page ? `, p. ${fact.page}` : ''}`
+    });
+  }
+
+  // Fallback if document text format didn't produce enough statement pairs
+  if (cards.length < 3) {
+    chunks.slice(0, 4).forEach((chunk, idx) => {
+      const clean = cleanSentence(chunk.text);
+      const sentences = clean.split(/(?<=[.?!])\s+/).filter(Boolean);
+      if (sentences.length >= 1) {
+        cards.push({
+          id: `fc-fallback-${idx}`,
+          docId: chunk.docId,
+          front: `Key Takeaway from Excerpt #${chunk.chunkIndex + 1}:`,
+          back: sentences.slice(0, 2).join(' '),
+          sourceRef: `${chunk.docName}${chunk.pageNumber ? `, p. ${chunk.pageNumber}` : ''}`
+        });
+      }
+    });
+  }
 
   return cards;
+}
+
+/**
+ * Generate document-grounded suggested questions for the chat desk
+ */
+export function generateSuggestedQuestions(chunks: DocumentChunk[]): string[] {
+  if (chunks.length === 0) {
+    return [
+      'What are the core foundational topics covered in this document?',
+      'Can you summarize the major principles in simple terms?',
+      'What are the key technical terms and their definitions?',
+      'Can you test my understanding with a conceptual problem?'
+    ];
+  }
+
+  const facts = extractFactSentences(chunks);
+  const questions: string[] = [];
+
+  for (const fact of facts) {
+    if (questions.length >= 4) break;
+    const q = `How does ${fact.subject} work, and why is it important in ${fact.sourceDoc.replace(/\.[^/.]+$/, '')}?`;
+    if (!questions.includes(q)) questions.push(q);
+  }
+
+  // Fallback questions using document name and chunk keywords
+  while (questions.length < 4) {
+    const docName = chunks[0]?.docName.replace(/\.[^/.]+$/, '') || 'your notes';
+    const fallbacks = [
+      `Summarize the key architectural concepts in ${docName}.`,
+      `Explain the most important mechanism detailed in this chapter.`,
+      `What are the practical applications described in ${docName}?`,
+      `Walk me through the foundational definitions step-by-step.`
+    ];
+    for (const fb of fallbacks) {
+      if (!questions.includes(fb) && questions.length < 4) questions.push(fb);
+    }
+  }
+
+  return questions;
 }

@@ -16,7 +16,8 @@ import { parseDocx } from './services/docxParser';
 import { chunkText } from './services/chunker';
 import {
   generateQuizzesFromChunks,
-  generateFlashcardsFromChunks
+  generateFlashcardsFromChunks,
+  generateSuggestedQuestions
 } from './services/quizGenerator';
 import { db, clearAllLocalData } from './db';
 import { SAMPLE_BIOLOGY_DOCUMENT } from './data/sampleBiologyDoc';
@@ -151,7 +152,7 @@ export function App() {
       embeddedChunks.push({
         ...c,
         embedding: vec || undefined,
-        pageNumber: pageCount ? Math.min(pageCount, Math.floor((i / newChunks.length) * pageCount) + 1) : 1
+        pageNumber: c.pageNumber || (pageCount ? Math.min(pageCount, Math.floor((i / newChunks.length) * pageCount) + 1) : 1)
       });
     }
 
@@ -430,6 +431,7 @@ export function App() {
             onStopGeneration={handleStopGeneration}
             onSelectCitation={(cite) => setActiveCitation(cite)}
             hasDocuments={documents.length > 0}
+            suggestedQuestions={generateSuggestedQuestions(chunks)}
           />
         </div>
 
@@ -442,6 +444,7 @@ export function App() {
           <StudyStudio
             quizzes={quizzes}
             flashcards={flashcards}
+            chunks={chunks}
             onGenerateQuizzes={handleGenerateQuizzes}
             hasDocuments={documents.length > 0}
           />

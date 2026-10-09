@@ -5,6 +5,16 @@ export interface ChunkOptions {
   wordOverlap?: number;
 }
 
+/**
+ * Clean text from page tags and normalize spacing
+ */
+export function cleanDocumentText(text: string): string {
+  return text
+    .replace(/\[Page \d+\]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function chunkText(
   text: string,
   docId: string,
@@ -13,21 +23,30 @@ export function chunkText(
 ): DocumentChunk[] {
   const { wordsPerChunk = 250, wordOverlap = 40 } = options;
 
-  // Split into paragraphs first to avoid awkward breaks
-  const paragraphs = text
-    .split(/\n\s*\n/)
-    .map(p => p.trim())
-    .filter(p => p.length > 0);
+  // Split text by page headers or paragraphs
+  const rawSections = text.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
 
   const chunks: DocumentChunk[] = [];
   let currentWords: string[] = [];
+  let currentPage = 1;
   let chunkCounter = 0;
 
-  for (const para of paragraphs) {
-    const paraWords = para.split(/\s+/).filter(w => w.length > 0);
+  for (const section of rawSections) {
+    // Check if section contains page marker
+    const pageMatch = section.match(/\[Page (\d+)\]/i);
+    if (pageMatch) {
+      const parsedPage = parseInt(pageMatch[1], 10);
+      if (!isNaN(parsedPage)) currentPage = parsedPage;
+    }
 
-    if (currentWords.length + paraWords.length <= wordsPerChunk) {
-      currentWords.push(...paraWords);
+    // Clean out [Page X] headers from content
+    const cleaned = section.replace(/\[Page \d+\]/gi, '').trim();
+    if (!cleaned) continue;
+
+    const words = cleaned.split(/\s+/).filter(w => w.length > 0);
+
+    if (currentWords.length + words.length <= wordsPerChunk) {
+      currentWords.push(...words);
     } else {
       if (currentWords.length > 0) {
         const chunkContent = currentWords.join(' ');
@@ -37,24 +56,24 @@ export function chunkText(
           docName,
           chunkIndex: chunkCounter,
           text: chunkContent,
+          pageNumber: currentPage,
           tokenEstimate: Math.round(currentWords.length * 1.3)
         });
         chunkCounter++;
 
-        // Keep overlap words from the end
         const overlapCount = Math.min(wordOverlap, currentWords.length);
         const overlap = currentWords.slice(currentWords.length - overlapCount);
-        currentWords = [...overlap, ...paraWords];
+        currentWords = [...overlap, ...words];
       } else {
-        // Single paragraph larger than wordsPerChunk
-        for (let i = 0; i < paraWords.length; i += (wordsPerChunk - wordOverlap)) {
-          const slice = paraWords.slice(i, i + wordsPerChunk);
+        for (let i = 0; i < words.length; i += (wordsPerChunk - wordOverlap)) {
+          const slice = words.slice(i, i + wordsPerChunk);
           chunks.push({
             id: `${docId}-chunk-${chunkCounter}`,
             docId,
             docName,
             chunkIndex: chunkCounter,
             text: slice.join(' '),
+            pageNumber: currentPage,
             tokenEstimate: Math.round(slice.length * 1.3)
           });
           chunkCounter++;
@@ -72,6 +91,7 @@ export function chunkText(
       docName,
       chunkIndex: chunkCounter,
       text: currentWords.join(' '),
+      pageNumber: currentPage,
       tokenEstimate: Math.round(currentWords.length * 1.3)
     });
   }

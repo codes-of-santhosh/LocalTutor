@@ -24,20 +24,14 @@ interface ChatTutorProps {
   onStopGeneration: () => void;
   onSelectCitation: (citation: SourceCitation) => void;
   hasDocuments: boolean;
+  suggestedQuestions?: string[];
 }
 
 const READING_LEVELS: { id: ReadingLevel; label: string; desc: string; icon: string }[] = [
   { id: 'elementary', label: 'Age 10 (Fun)', desc: 'Simple analogies & fun visual metaphors', icon: '🧒' },
   { id: 'high_school', label: 'High School', desc: 'Clear fundamentals & real-world connections', icon: '🎒' },
   { id: 'undergraduate', label: 'Undergraduate', desc: 'Rigorous collegiate terminology & mechanisms', icon: '🎓' },
-  { id: 'expert', label: 'Expert / Research', desc: 'Deep biochemical kinetics & thermodynamics', icon: '🔬' }
-];
-
-const SUGGESTED_QUESTIONS = [
-  'Why does the inner membrane have cristae folds?',
-  'What happens if oxygen is absent in cellular respiration?',
-  'How does ATP synthase act like a microscopic rotary motor?',
-  'Explain the proton-motive force simply.'
+  { id: 'expert', label: 'Expert / Research', desc: 'Deep scientific principles & formal models', icon: '🔬' }
 ];
 
 export const ChatTutor = ({
@@ -50,7 +44,8 @@ export const ChatTutor = ({
   isGenerating,
   onStopGeneration,
   onSelectCitation,
-  hasDocuments
+  hasDocuments,
+  suggestedQuestions = []
 }: ChatTutorProps) => {
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -155,14 +150,14 @@ export const ChatTutor = ({
               Ask anything about your uploaded textbook or notes. LocalTutor adapts to your level and answers strictly from your material with 100% on-device privacy.
             </p>
 
-            {hasDocuments && (
+            {hasDocuments && suggestedQuestions.length > 0 && (
               <div className="mt-6 w-full space-y-2">
                 <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold justify-center">
                   <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
                   <span>Try asking one of these:</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
-                  {SUGGESTED_QUESTIONS.map((q, idx) => (
+                  {suggestedQuestions.map((q, idx) => (
                     <button
                       key={idx}
                       onClick={() => onSendMessage(q)}
